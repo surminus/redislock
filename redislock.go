@@ -68,7 +68,7 @@ func (c *Client) Obtain(key string, ttl time.Duration, opt *Options) (*Lock, err
 		if err != nil {
 			return nil, err
 		} else if ok {
-			return &Lock{client: c, key: key, value: value}, nil
+			return &Lock{Client: c, Key: key, Value: value}, nil
 		}
 
 		backoff := retry.NextBackoff()
@@ -119,9 +119,9 @@ func (c *Client) randomToken() (string, error) {
 
 // Lock represents an obtained, distributed lock.
 type Lock struct {
-	client *Client
-	key    string
-	value  string
+	Client *Client
+	Key    string
+	Value  string
 }
 
 // Obtain is a short-cut for New(...).Obtain(...).
@@ -130,23 +130,23 @@ func Obtain(client RedisClient, key string, ttl time.Duration, opt *Options) (*L
 }
 
 // Key returns the redis key used by the lock.
-func (l *Lock) Key() string {
-	return l.key
+func (l *Lock) GetKey() string {
+	return l.Key
 }
 
 // Token returns the token value set by the lock.
 func (l *Lock) Token() string {
-	return l.value[:22]
+	return l.Value[:22]
 }
 
 // Metadata returns the metadata of the lock.
 func (l *Lock) Metadata() string {
-	return l.value[22:]
+	return l.Value[22:]
 }
 
 // TTL returns the remaining time-to-live. Returns 0 if the lock has expired.
 func (l *Lock) TTL() (time.Duration, error) {
-	res, err := luaPTTL.Run(l.client.client, []string{l.key}, l.value).Result()
+	res, err := luaPTTL.Run(l.Client.client, []string{l.Key}, l.Value).Result()
 	if err == redis.Nil {
 		return 0, nil
 	} else if err != nil {
@@ -163,7 +163,7 @@ func (l *Lock) TTL() (time.Duration, error) {
 // May return ErrNotObtained if refresh is unsuccessful.
 func (l *Lock) Refresh(ttl time.Duration, opt *Options) error {
 	ttlVal := strconv.FormatInt(int64(ttl/time.Millisecond), 10)
-	status, err := luaRefresh.Run(l.client.client, []string{l.key}, l.value, ttlVal).Result()
+	status, err := luaRefresh.Run(l.Client.client, []string{l.Key}, l.Value, ttlVal).Result()
 	if err != nil {
 		return err
 	} else if status == int64(1) {
@@ -175,7 +175,7 @@ func (l *Lock) Refresh(ttl time.Duration, opt *Options) error {
 // Release manually releases the lock.
 // May return ErrLockNotHeld.
 func (l *Lock) Release() error {
-	res, err := luaRelease.Run(l.client.client, []string{l.key}, l.value).Result()
+	res, err := luaRelease.Run(l.Client.client, []string{l.Key}, l.Value).Result()
 	if err == redis.Nil {
 		return ErrLockNotHeld
 	} else if err != nil {
